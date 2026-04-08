@@ -78,6 +78,44 @@ for ef in ef_values:
     hnsw_recalls.append(recall)
     hnsw_latencies.append(lat_ms)
     print(f"{ef:>10}  {recall:>12.4f}  {lat_ms:>11.3f}ms")
+    
+
+# ------------------------------------------------------------------
+# hnswlib
+# ------------------------------------------------------------------
+ 
+print("\n--- hnswlib (production CPU) ---")
+import hnswlib
+ 
+ef_values_lib = [10, 20, 50, 100, 200, 400]
+lib_recalls = []
+lib_latencies = []
+ 
+print("Building index...")
+t0 = time.perf_counter()
+lib_index = hnswlib.Index(space='l2', dim=D)
+lib_index.init_index(max_elements=N, ef_construction=200, M=16)
+lib_index.add_items(dataset)
+lib_build_time = time.perf_counter() - t0
+print(f"Build time: {lib_build_time:.3f}s")
+ 
+print(f"\n{'ef_search':>10}  {'recall@'+str(K):>12}  {'latency(ms)':>12}")
+print("-" * 38)
+ 
+for ef in ef_values_lib:
+    lib_index.set_ef(ef)
+    t0 = time.perf_counter()
+    labels, _ = lib_index.knn_query(queries, k=K)
+    elapsed = time.perf_counter() - t0
+    recall = float(np.mean([
+        len(set(labels[i]) & gt[i]) / K
+        for i in range(N_QUERIES)
+    ]))
+    lat_ms = elapsed / N_QUERIES * 1000
+    lib_recalls.append(recall)
+    lib_latencies.append(lat_ms)
+    print(f"{ef:>10}  {recall:>12.4f}  {lat_ms:>11.3f}ms")
+
 
 # ------------------------------------------------------------------
 # CAGRA benchmark
