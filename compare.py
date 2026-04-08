@@ -78,7 +78,7 @@ for ef in ef_values:
     hnsw_recalls.append(recall)
     hnsw_latencies.append(lat_ms)
     print(f"{ef:>10}  {recall:>12.4f}  {lat_ms:>11.3f}ms")
-    
+
 
 # ------------------------------------------------------------------
 # hnswlib
@@ -262,13 +262,13 @@ plt.show()
 # Summary table
 # ------------------------------------------------------------------
 
-print("\n" + "=" * 55)
-print(f"{'SUMMARY':^55}")
-print("=" * 55)
-print(f"{'Metric':<30} {'HNSW':>10} {'CAGRA':>10}")
-print("-" * 55)
-print(f"{'Build time (s)':<30} {hnsw_build_time:>10.2f} {cagra_build_time:>10.3f}")
-print(f"{'Max recall@'+str(K):<30} {max(hnsw_recalls):>10.4f} {max(cagra_recalls):>10.4f}")
-print(f"{'Min latency (ms)':<30} {min(hnsw_latencies):>10.3f} {min(cagra_latencies):>10.3f}")
-print(f"{'Speedup (build)':<30} {'1.0x':>10} {hnsw_build_time/cagra_build_time:>9.1f}x")
-print("=" * 55)
+print("\n" + "=" * 62)
+print(f"{'SUMMARY':^62}")
+print("=" * 62)
+print(f"{'Metric':<30} {'Our HNSW':>10} {'hnswlib':>10} {'CAGRA':>8}")
+print("-" * 62)
+print(f"{'Build time (s)':<30} {our_build_time:>10.2f} {lib_build_time:>10.3f} {cagra_build_time:>8.3f}")
+print(f"{'Max recall@'+str(K):<30} {max(our_recalls):>10.4f} {max(lib_recalls):>10.4f} {max(cagra_recalls):>8.4f}")
+print(f"{'Min latency (ms)':<30} {min(our_latencies):>10.3f} {min(lib_latencies):>10.3f} {min(cagra_latencies):>8.3f}")
+print(f"{'Build speedup vs ours':<30} {'1.0x':>10} {our_build_time/lib_build_time:>9.1f}x {our_build_time/cagra_build_time:>7.1f}x")
+print("=" * 62)
