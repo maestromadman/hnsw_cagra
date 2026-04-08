@@ -79,7 +79,6 @@ for ef in ef_values:
     hnsw_latencies.append(lat_ms)
     print(f"{ef:>10}  {recall:>12.4f}  {lat_ms:>11.3f}ms")
 
-
 # ------------------------------------------------------------------
 # hnswlib
 # ------------------------------------------------------------------
@@ -115,7 +114,7 @@ for ef in ef_values_lib:
     lib_recalls.append(recall)
     lib_latencies.append(lat_ms)
     print(f"{ef:>10}  {recall:>12.4f}  {lat_ms:>11.3f}ms")
-
+    
 
 # ------------------------------------------------------------------
 # CAGRA benchmark
@@ -179,89 +178,74 @@ for itopk in itopk_values:
     print(f"{itopk:>10}  {recall:>12.4f}  {lat_ms:>11.3f}ms")
 
 # ------------------------------------------------------------------
-# Plot comparison
+# Plot
 # ------------------------------------------------------------------
-
+ 
 print("\nGenerating comparison plot...")
-
-fig = plt.figure(figsize=(15, 5))
-gs = gridspec.GridSpec(1, 3, figure=fig)
-
-HNSW_COLOR  = "#378ADD"
+ 
+OUR_COLOR   = "#888780"
+LIB_COLOR   = "#378ADD"
 CAGRA_COLOR = "#1D9E75"
-
+ 
+fig = plt.figure(figsize=(16, 5))
+gs = gridspec.GridSpec(1, 3, figure=fig)
+ 
 # --- Plot 1: Recall vs beam width ---
 ax1 = fig.add_subplot(gs[0])
-ax1.plot(ef_values, hnsw_recalls,
-         "o-", color=HNSW_COLOR, lw=2, label="HNSW (ef_search)")
-ax1.plot(itopk_values, cagra_recalls,
-         "s-", color=CAGRA_COLOR, lw=2, label="CAGRA (itopk_size)")
-ax1.set_xlabel("Beam width")
+ax1.plot(ef_values,     our_recalls,   "o--", color=OUR_COLOR,   lw=2, label="Our HNSW")
+ax1.plot(ef_values_lib, lib_recalls,   "o-",  color=LIB_COLOR,   lw=2, label="hnswlib")
+ax1.plot(itopk_values,  cagra_recalls, "s-",  color=CAGRA_COLOR, lw=2, label="CAGRA (GPU)")
+ax1.set_xlabel("Beam width (ef / itopk)")
 ax1.set_ylabel(f"Recall@{K}")
 ax1.set_title("Recall vs beam width")
 ax1.set_ylim(0, 1.05)
-ax1.axhline(1.0, color="#aaa", lw=0.8, linestyle="--")
+ax1.axhline(1.0, color="#ccc", lw=0.8, linestyle="--")
 ax1.legend()
 ax1.grid(True, alpha=0.2)
-
-# --- Plot 2: Recall vs latency (tradeoff curve) ---
+ 
+# --- Plot 2: Recall vs latency ---
 ax2 = fig.add_subplot(gs[1])
-ax2.plot(hnsw_latencies, hnsw_recalls,
-         "o-", color=HNSW_COLOR, lw=2, label="HNSW")
-ax2.plot(cagra_latencies, cagra_recalls,
-         "s-", color=CAGRA_COLOR, lw=2, label="CAGRA")
-
-for ef, lat, rec in zip(ef_values, hnsw_latencies, hnsw_recalls):
-    ax2.annotate(f"ef={ef}", (lat, rec),
-                 fontsize=7, xytext=(4, -10), textcoords="offset points",
-                 color=HNSW_COLOR)
-for itopk, lat, rec in zip(itopk_values, cagra_latencies, cagra_recalls):
-    ax2.annotate(f"it={itopk}", (lat, rec),
-                 fontsize=7, xytext=(4, 4), textcoords="offset points",
-                 color=CAGRA_COLOR)
-
+ax2.plot(our_latencies,   our_recalls,   "o--", color=OUR_COLOR,   lw=2, label="Our HNSW")
+ax2.plot(lib_latencies,   lib_recalls,   "o-",  color=LIB_COLOR,   lw=2, label="hnswlib")
+ax2.plot(cagra_latencies, cagra_recalls, "s-",  color=CAGRA_COLOR, lw=2, label="CAGRA (GPU)")
 ax2.set_xlabel("Latency per query (ms)")
 ax2.set_ylabel(f"Recall@{K}")
 ax2.set_title("Recall vs latency tradeoff")
 ax2.set_ylim(0, 1.05)
 ax2.legend()
 ax2.grid(True, alpha=0.2)
-
+ 
 # --- Plot 3: Build time ---
 ax3 = fig.add_subplot(gs[2])
-bars = ax3.bar(
-    ["HNSW\n(CPU)", "CAGRA\n(GPU L4)"],
-    [hnsw_build_time, cagra_build_time],
-    color=[HNSW_COLOR, CAGRA_COLOR],
-    width=0.4,
-    alpha=0.85,
-)
-for bar, val in zip(bars, [hnsw_build_time, cagra_build_time]):
+labels_bar = ["Our HNSW\n(CPU)", "hnswlib\n(CPU)", "CAGRA\n(GPU L4)"]
+times_bar  = [our_build_time, lib_build_time, cagra_build_time]
+colors_bar = [OUR_COLOR, LIB_COLOR, CAGRA_COLOR]
+bars = ax3.bar(labels_bar, times_bar, color=colors_bar, width=0.4, alpha=0.85)
+for bar, val in zip(bars, times_bar):
     ax3.text(
         bar.get_x() + bar.get_width() / 2,
         bar.get_height() + 0.5,
-        f"{val:.1f}s",
-        ha="center", va="bottom", fontsize=11, fontweight="500"
+        f"{val:.2f}s",
+        ha="center", va="bottom", fontsize=10, fontweight="500"
     )
 ax3.set_ylabel("Build time (s)")
 ax3.set_title(f"Index build time\n(N={N:,}, D={D})")
 ax3.grid(True, alpha=0.2, axis="y")
-
+ 
 plt.suptitle(
-    f"HNSW vs CAGRA  —  N={N:,} vectors, D={D}, k={K}  —  NVIDIA L4 GPU",
-    fontsize=13, fontweight="500", y=1.02
+    f"Our HNSW vs hnswlib vs CAGRA  —  N={N:,}, D={D}, k={K}  —  NVIDIA L4",
+    fontsize=12, fontweight="500", y=1.02
 )
-
+ 
 plt.tight_layout()
 os.makedirs("results", exist_ok=True)
 plt.savefig("results/comparison.png", dpi=150, bbox_inches="tight")
 print("Saved to results/comparison.png")
-plt.show()
-
+ 
 # ------------------------------------------------------------------
 # Summary table
 # ------------------------------------------------------------------
-
+ 
 print("\n" + "=" * 62)
 print(f"{'SUMMARY':^62}")
 print("=" * 62)
