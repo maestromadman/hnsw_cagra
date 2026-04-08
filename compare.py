@@ -19,7 +19,7 @@ import matplotlib.gridspec as gridspec
 # Shared dataset — both benchmarks use identical data
 # ------------------------------------------------------------------
 
-N = 50000
+N = 10000
 D = 128
 K = 10
 SEED = 42
@@ -98,7 +98,6 @@ itopk_values = [16, 32, 64, 128, 256, 512]
 cagra_recalls = []
 cagra_latencies = []
 
-handle = DeviceResources()
 dataset_gpu = cp.asarray(dataset)
 queries_gpu = cp.asarray(queries)
 
@@ -110,8 +109,7 @@ build_params = cagra.IndexParams(
 
 print("Building index...")
 t0 = time.perf_counter()
-cagra_index = cagra.build(build_params, dataset_gpu, handle=handle)
-handle.sync()
+cagra_index = cagra.build(build_params, dataset_gpu)
 cagra_build_time = time.perf_counter() - t0
 print(f"Build time: {cagra_build_time:.3f}s")
 
@@ -122,14 +120,13 @@ for itopk in itopk_values:
     search_params = cagra.SearchParams(itopk_size=itopk)
 
     # warmup
-    _ = cagra.search(search_params, cagra_index, queries_gpu[:10], K, handle=handle)
-    handle.sync()
+    _ = cagra.search(search_params, cagra_index, queries_gpu[:10], K)
+    
 
     t0 = time.perf_counter()
     _, neighbors_gpu = cagra.search(
-        search_params, cagra_index, queries_gpu, K, handle=handle
+        search_params, cagra_index, queries_gpu, K
     )
-    handle.sync()
     elapsed = time.perf_counter() - t0
 
     neighbors_cpu = cp.asnumpy(neighbors_gpu)
