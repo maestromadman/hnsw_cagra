@@ -192,7 +192,7 @@ gs = gridspec.GridSpec(1, 3, figure=fig)
  
 # --- Plot 1: Recall vs beam width ---
 ax1 = fig.add_subplot(gs[0])
-ax1.plot(ef_values,     our_recalls,   "o--", color=OUR_COLOR,   lw=2, label="Our HNSW")
+ax1.plot(ef_values,     hnsw_recalls,   "o--", color=OUR_COLOR,   lw=2, label="Our HNSW")
 ax1.plot(ef_values_lib, lib_recalls,   "o-",  color=LIB_COLOR,   lw=2, label="hnswlib")
 ax1.plot(itopk_values,  cagra_recalls, "s-",  color=CAGRA_COLOR, lw=2, label="CAGRA (GPU)")
 ax1.set_xlabel("Beam width (ef / itopk)")
@@ -205,7 +205,7 @@ ax1.grid(True, alpha=0.2)
  
 # --- Plot 2: Recall vs latency ---
 ax2 = fig.add_subplot(gs[1])
-ax2.plot(our_latencies,   our_recalls,   "o--", color=OUR_COLOR,   lw=2, label="Our HNSW")
+ax2.plot(hnsw_latencies,   hnsw_recalls,   "o--", color=OUR_COLOR,   lw=2, label="Our HNSW")
 ax2.plot(lib_latencies,   lib_recalls,   "o-",  color=LIB_COLOR,   lw=2, label="hnswlib")
 ax2.plot(cagra_latencies, cagra_recalls, "s-",  color=CAGRA_COLOR, lw=2, label="CAGRA (GPU)")
 ax2.set_xlabel("Latency per query (ms)")
@@ -218,7 +218,7 @@ ax2.grid(True, alpha=0.2)
 # --- Plot 3: Build time ---
 ax3 = fig.add_subplot(gs[2])
 labels_bar = ["Our HNSW\n(CPU)", "hnswlib\n(CPU)", "CAGRA\n(GPU L4)"]
-times_bar  = [our_build_time, lib_build_time, cagra_build_time]
+times_bar  = [hnsw_build_time, lib_build_time, cagra_build_time]
 colors_bar = [OUR_COLOR, LIB_COLOR, CAGRA_COLOR]
 bars = ax3.bar(labels_bar, times_bar, color=colors_bar, width=0.4, alpha=0.85)
 for bar, val in zip(bars, times_bar):
@@ -251,8 +251,8 @@ print(f"{'SUMMARY':^62}")
 print("=" * 62)
 print(f"{'Metric':<30} {'Our HNSW':>10} {'hnswlib':>10} {'CAGRA':>8}")
 print("-" * 62)
-print(f"{'Build time (s)':<30} {our_build_time:>10.2f} {lib_build_time:>10.3f} {cagra_build_time:>8.3f}")
-print(f"{'Max recall@'+str(K):<30} {max(our_recalls):>10.4f} {max(lib_recalls):>10.4f} {max(cagra_recalls):>8.4f}")
-print(f"{'Min latency (ms)':<30} {min(our_latencies):>10.3f} {min(lib_latencies):>10.3f} {min(cagra_latencies):>8.3f}")
-print(f"{'Build speedup vs ours':<30} {'1.0x':>10} {our_build_time/lib_build_time:>9.1f}x {our_build_time/cagra_build_time:>7.1f}x")
+print(f"{'Build time (s)':<30} {hnsw_build_time:>10.2f} {lib_build_time:>10.3f} {cagra_build_time:>8.3f}")
+print(f"{'Max recall@'+str(K):<30} {max(hnsw_recalls):>10.4f} {max(lib_recalls):>10.4f} {max(cagra_recalls):>8.4f}")
+print(f"{'Min latency (ms)':<30} {min(hnsw_latencies):>10.3f} {min(lib_latencies):>10.3f} {min(cagra_latencies):>8.3f}")
+print(f"{'Build speedup vs ours':<30} {'1.0x':>10} {hnsw_build_time/lib_build_time:>9.1f}x {hnsw_build_time/cagra_build_time:>7.1f}x")
 print("=" * 62)
