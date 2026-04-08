@@ -1,0 +1,61 @@
+(cuvs-env) amallya0523@vllm-nsight:~/hnsw_cagra$ python compare.py
+Dataset: 10000 vectors, 128 dims, 500 queries, k=10
+
+Computing ground truth...
+Done.
+
+--- HNSW ---
+Building index...
+Build time: 166.72s
+
+ ef_search     recall@10   latency(ms)
+--------------------------------------
+        10        0.1498        0.927ms
+        20        0.2142        1.620ms
+        50        0.3374        2.745ms
+       100        0.4626        4.385ms
+       200        0.5960        7.031ms
+       400        0.7354       10.948ms
+
+--- hnswlib (production CPU) ---
+Building index...
+Build time: 1.274s
+
+ ef_search     recall@10   latency(ms)
+--------------------------------------
+        10        0.3558        0.011ms
+        20        0.5058        0.016ms
+        50        0.7392        0.032ms
+       100        0.8798        0.058ms
+       200        0.9610        0.104ms
+       400        0.9924        0.190ms
+
+--- CAGRA ---
+Building index...
+using ivf_pq::index_params nrows 10000, dim 128, n_lists 100, pq_dim 32
+[2026-04-08 03:06:34.616] [RAFT] [info] optimizing graph
+[2026-04-08 03:06:34.690] [RAFT] [info] Graph optimized, creating index
+Build time: 0.633s
+
+     itopk     recall@10   latency(ms)
+--------------------------------------
+        16        0.4750        0.005ms
+        32        0.6788        0.005ms
+        64        0.8740        0.005ms
+       128        0.9718        0.007ms
+       256        0.9982        0.011ms
+       512        1.0000        0.023ms
+
+Generating comparison plot...
+Saved to results/comparison.png
+
+==============================================================
+                           SUMMARY                            
+==============================================================
+Metric                           Our HNSW    hnswlib    CAGRA
+--------------------------------------------------------------
+Build time (s)                     166.72      1.274    0.633
+Max recall@10                      0.7354     0.9924   1.0000
+Min latency (ms)                    0.927      0.011    0.005
+Build speedup vs ours                1.0x     130.9x   263.3x
+==============================================================
