@@ -56,8 +56,8 @@ queries_gpu = cp.asarray(queries)
 
 print("Computing ground truth (GPU brute force)…")
 t0 = time.perf_counter()
-_, gt_neighbors_gpu = brute_force.knn(dataset_gpu, queries_gpu, K,
-                                      metric="sqeuclidean")
+bf_index = brute_force.build(dataset_gpu, metric="sqeuclidean")
+_, gt_neighbors_gpu = brute_force.search(bf_index, queries_gpu, K)
 cp.cuda.Stream.null.synchronize()
 gt_neighbors_cpu = cp.asnumpy(gt_neighbors_gpu)
 gt = [set(gt_neighbors_cpu[i]) for i in range(N_QUERIES)]
