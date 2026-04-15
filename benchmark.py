@@ -224,7 +224,7 @@ def plot(results, n_vectors, dim, k, metric):
     )
 
     plt.tight_layout()
-    out = "benchmark_results.png"
+    out = f"benchmark_n{n_vectors}_dim{dim}_k{k}_{metric}.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     print(f"\n  Plot saved \u2192 {out}")
     plt.show()
