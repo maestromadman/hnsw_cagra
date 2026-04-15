@@ -1,9 +1,5 @@
 """
-cagra.py — cuVS CAGRA (GPU graph-based ANN) vector index wrapper.
-
-CAGRA builds a navigable small-world graph entirely on GPU, achieving very
-high QPS at excellent recall — particularly suited for large-scale, latency-
-sensitive serving workloads.
+ivf_flat.py — cuVS IVF-Flat (GPU) vector index wrapper.
 
 Exposes a single `run()` function consumed by benchmark.py.
 Can also be run standalone for a quick sanity check.
@@ -28,23 +24,21 @@ def run(
     metric: str,
     gt: np.ndarray,
     *,
-    graph_degree: int = 64,
-    itopk_size: int = 64,
+    n_lists: int = 128,
+    n_probes: int = 20,
 ) -> dict:
     """
-    Build a cuVS CAGRA index on *data* and search *queries*.
+    Build a cuVS IVF-Flat index on *data* and search *queries*.
 
     Parameters
     ----------
-    data         : (N, D) float32 corpus
-    queries      : (Q, D) float32 query vectors
-    k            : neighbours to retrieve
-    metric       : "l2" or "ip"
-    gt           : (Q, k) int32 ground-truth neighbour indices
-    graph_degree : out-degree of each node in the CAGRA graph
-                   (higher → better recall, larger index, slower build)
-    itopk_size   : internal top-k candidate list during beam search
-                   (higher → better recall, lower QPS)
+    data     : (N, D) float32 corpus
+    queries  : (Q, D) float32 query vectors
+    k        : neighbours to retrieve
+    metric   : "l2" or "ip"
+    gt       : (Q, k) int32 ground-truth neighbour indices
+    n_lists  : number of IVF clusters (Voronoi cells)
+    n_probes : clusters probed at query time (accuracy vs speed)
 
     Returns
     -------
@@ -52,42 +46,42 @@ def run(
     """
     try:
         import cupy as cp
-        from cuvs.neighbors import cagra
+        from cuvs.neighbors import ivf_flat
         from cuvs.common import Resources
     except ImportError:
         return {
-            "label": "CAGRA (cuVS)",
+            "label": "IVF-Flat (cuVS)",
             "error": "cuvs / cupy not installed — requires CUDA GPU",
         }
 
     res        = Resources()
     metric_str = _METRIC_MAP.get(metric, "sqeuclidean")
-    params     = cagra.IndexParams(graph_degree=graph_degree, metric=metric_str)
+    params     = ivf_flat.IndexParams(n_lists=n_lists, metric=metric_str)
 
     d_data    = cp.asarray(data)
     d_queries = cp.asarray(queries)
 
     # ── Build ──────────────────────────────────────────────────────────────────
     t0 = time.perf_counter()
-    index = cagra.build(params, d_data, handle=res)
+    index = ivf_flat.build(params, d_data, handle=res)
     cp.cuda.Stream.null.synchronize()
     build_s = time.perf_counter() - t0
 
     # ── Search ─────────────────────────────────────────────────────────────────
-    sp = cagra.SearchParams(itopk_size=itopk_size)
+    sp = ivf_flat.SearchParams(n_probes=n_probes)
     t0 = time.perf_counter()
-    _, labels = cagra.search(sp, index, d_queries, k, handle=res)
+    _, labels = ivf_flat.search(sp, index, d_queries, k, handle=res)
     cp.cuda.Stream.null.synchronize()
     query_s = time.perf_counter() - t0
 
     labels_np = cp.asnumpy(labels).astype(np.int32)
 
-    # Memory: graph edges (uint32) + raw vectors
+    # Memory: raw float32 vectors (IVF-Flat stores full vectors)
     n, dim = data.shape
-    mem_mb = n * graph_degree * 4 / 1024 ** 2  # graph adjacency (uint32 per edge)
+    mem_mb = n * dim * 4 / 1024 ** 2
 
     return {
-        "label":   "CAGRA (cuVS)",
+        "label":   "IVF-Flat (cuVS)",
         "build_s": build_s,
         "query_s": query_s,
         "qps":     len(queries) / query_s,

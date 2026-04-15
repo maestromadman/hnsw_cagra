@@ -1,229 +1,108 @@
+"""
+hnsw.py — hnswlib (CPU HNSW) vector index wrapper.
+
+Exposes a single `run()` function consumed by benchmark.py.
+Can also be run standalone for a quick sanity check.
+"""
+
+import time
 import numpy as np
-import heapq
 
-class HNSW:
-    def __init__(self, M=16, ef_construction=200, distance='euclidean', seed=None):
-        self.M = M
-        self.M0 = 2 * M                    # layer 0 gets more neighbors
-        self.ef_construction = ef_construction
-        self.mL = 1.0 / np.log(M)         # controls layer assignment spread
 
-        if distance == 'euclidean':
-            self.dist = HNSW.euclidean
-        elif distance == 'cosine':
-            self.dist = HNSW.cosine
-        else:
-            raise ValueError(f"Unknown distance: {distance}")
+# ──────────────────────────────────────────────────────────────────────────────
+# Memory estimate
+# Each vector: DIM * 4 bytes (float32) + M * 2 neighbour links * 4 bytes each
+# ──────────────────────────────────────────────────────────────────────────────
+def _mem_mb(n: int, dim: int, m: int) -> float:
+    return n * (dim * 4 + m * 2 * 4) / 1024 ** 2
 
-        self.rng = np.random.default_rng(seed)
 
-        self.vectors = []        # list of np.ndarray — the actual data
-        self.graphs = []         # graphs[layer][node_id] = [neighbor_ids]
-        self.entry_point = None  # single entry node at the top layer
-        self.max_layer = -1
+def run(
+    data: np.ndarray,
+    queries: np.ndarray,
+    k: int,
+    metric: str,
+    gt: np.ndarray,
+    *,
+    m: int = 16,
+    ef_construction: int = 200,
+    ef_search: int = 50,
+) -> dict:
+    """
+    Build an HNSW index on *data* and search *queries*.
 
-    # ------------------------------------------------------------------
-    # Distance functions
-    # ------------------------------------------------------------------
+    Parameters
+    ----------
+    data            : (N, D) float32 corpus
+    queries         : (Q, D) float32 query vectors
+    k               : neighbours to retrieve
+    metric          : "l2" or "ip"
+    gt              : (Q, k) int32 ground-truth neighbour indices
+    m               : HNSW M (bi-directional links per node)
+    ef_construction : build-time ef
+    ef_search       : query-time ef
 
-    @staticmethod
-    def euclidean(a, b):
-        diff = a - b
-        return float(np.dot(diff, diff))   # squared L2, no sqrt needed
+    Returns
+    -------
+    dict with keys: label, build_s, query_s, qps, recall, mem_mb
+    """
+    try:
+        import hnswlib
+    except ImportError:
+        return {"label": "HNSW", "error": "hnswlib not installed — pip install hnswlib"}
 
-    @staticmethod
-    def cosine(a, b):
-        denom = np.linalg.norm(a) * np.linalg.norm(b)
-        if denom == 0:
-            return 1.0
-        return 1.0 - float(np.dot(a, b) / denom)
+    n, dim = data.shape
+    space = metric  # hnswlib uses "l2" / "ip" directly
 
-    # ------------------------------------------------------------------
-    # Layer sampling
-    # ------------------------------------------------------------------
+    idx = hnswlib.Index(space=space, dim=dim)
+    idx.init_index(max_elements=n, ef_construction=ef_construction, M=m)
 
-    def sample_layer(self):
-        # exponential distribution — most nodes land at 0,
-        # probability roughly halves with each layer up
-        return min(int(-np.log(self.rng.uniform()) * self.mL), 16)
+    # ── Build ──────────────────────────────────────────────────────────────────
+    t0 = time.perf_counter()
+    idx.add_items(data)
+    build_s = time.perf_counter() - t0
 
-    # ------------------------------------------------------------------
-    # Core search primitive
-    # ------------------------------------------------------------------
+    # ── Search ─────────────────────────────────────────────────────────────────
+    idx.set_ef(ef_search)
+    t0 = time.perf_counter()
+    labels, _ = idx.knn_query(queries, k=k)
+    query_s = time.perf_counter() - t0
 
-    def search_layer(self, query, entry_points, ef, layer):
-        visited = set(entry_points)
-        candidates = []   # min-heap: (dist, node_id) — what to explore next
-        found = []        # max-heap: (-dist, node_id) — best ef results so far
+    labels = np.array(labels, dtype=np.int32)
 
-        for ep in entry_points:
-            d = self.dist(query, self.vectors[ep])
-            heapq.heappush(candidates, (d, ep))
-            heapq.heappush(found, (-d, ep))
+    return {
+        "label":   "HNSW",
+        "build_s": build_s,
+        "query_s": query_s,
+        "qps":     len(queries) / query_s,
+        "recall":  _recall_at_k(labels, gt),
+        "mem_mb":  _mem_mb(n, dim, m),
+    }
 
-        while candidates:
-            c_dist, c_id = heapq.heappop(candidates)
 
-            worst_found = -found[0][0]
-            if c_dist > worst_found:
-                break   # can't improve — stop
+# ──────────────────────────────────────────────────────────────────────────────
+# Shared recall helper (also imported by benchmark.py)
+# ──────────────────────────────────────────────────────────────────────────────
+def _recall_at_k(retrieved: np.ndarray, ground_truth: np.ndarray) -> float:
+    nq, k = ground_truth.shape
+    hits = sum(
+        len(set(retrieved[i, :k].tolist()) & set(ground_truth[i, :k].tolist()))
+        for i in range(nq)
+    )
+    return hits / (nq * k)
 
-            for neighbor_id in self.graphs[layer].get(c_id, []):
-                if neighbor_id in visited:
-                    continue
-                visited.add(neighbor_id)
 
-                n_dist = self.dist(query, self.vectors[neighbor_id])
-                worst_found = -found[0][0]
+# ──────────────────────────────────────────────────────────────────────────────
+# Standalone quick-test
+# ──────────────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    rng  = np.random.default_rng(42)
+    data = np.ascontiguousarray(rng.standard_normal((5_000, 128)), dtype=np.float32)
+    q    = np.ascontiguousarray(rng.standard_normal((100,  128)), dtype=np.float32)
 
-                if n_dist < worst_found or len(found) < ef:
-                    heapq.heappush(candidates, (n_dist, neighbor_id))
-                    heapq.heappush(found, (-n_dist, neighbor_id))
-                    if len(found) > ef:
-                        heapq.heappop(found)   # evict worst
+    # Trivial brute-force ground truth for standalone test
+    d  = np.sum((q[:, None] - data[None]) ** 2, axis=-1)
+    gt = np.argsort(d, axis=1)[:, :10].astype(np.int32)
 
-        return sorted((-d, nid) for d, nid in found)
-
-    # ------------------------------------------------------------------
-    # Neighbor selection
-    # ------------------------------------------------------------------
-
-    def select_neighbors_simple(self, candidates, M):
-        # just take the M closest — candidates is already sorted ascending
-        return [nid for _, nid in candidates[:M]]
-
-    def select_neighbors_heuristic(self, query, candidates, M):
-        # keep only neighbors that point in genuinely new directions
-        selected = []
-
-        for dist_to_query, cid in candidates:
-            if len(selected) >= M:
-                break
-
-            is_useful = all(
-                dist_to_query < self.dist(self.vectors[cid], self.vectors[s])
-                for s in selected
-            )
-
-            if not selected or is_useful:
-                selected.append(cid)
-
-        return selected
-
-    # ------------------------------------------------------------------
-    # Insertion
-    # ------------------------------------------------------------------
-
-    def insert(self, vector, use_heuristic=True):
-        node_id = len(self.vectors)
-        self.vectors.append(np.array(vector, dtype=np.float32))
-
-        node_layer = self.sample_layer()
-
-        while len(self.graphs) <= node_layer:
-            self.graphs.append({})
-
-        # first node — no search, no edges, just register and return
-        if self.entry_point is None:
-            self.entry_point = node_id
-            self.max_layer = node_layer
-            for lc in range(node_layer + 1):
-                self.graphs[lc][node_id] = []
-            return node_id
-
-        ep = [self.entry_point]
-
-        # phase 1: fast greedy descent from top layer to node_layer+1
-        # ef=1 means take only the single best at each layer — just getting close
-        for lc in range(self.max_layer, node_layer, -1):
-            results = self.search_layer(vector, ep, ef=1, layer=lc)
-            ep = [results[0][1]]
-
-        # phase 2: proper beam search from node_layer down to 0
-        # this is where we actually find and wire up neighbors
-        for lc in range(min(node_layer, self.max_layer), -1, -1):
-            results = self.search_layer(vector, ep, ef=self.ef_construction, layer=lc)
-
-            M_layer = self.M0 if lc == 0 else self.M
-            if use_heuristic:
-                neighbors = self.select_neighbors_heuristic(vector, results, M_layer)
-            else:
-                neighbors = self.select_neighbors_simple(results, M_layer)
-
-            # connect new node to its selected neighbors
-            self.graphs[lc][node_id] = neighbors
-
-            # connect each neighbor back to new node (bidirectional edges)
-            for nb in neighbors:
-                if nb not in self.graphs[lc]:
-                    self.graphs[lc][nb] = []
-                self.graphs[lc][nb].append(node_id)
-
-                # if neighbor now exceeds M connections, prune it back down
-                if len(self.graphs[lc][nb]) > M_layer:
-                    nb_candidates = [
-                        (self.dist(self.vectors[nb], self.vectors[x]), x)
-                        for x in self.graphs[lc][nb]
-                    ]
-                    if use_heuristic:
-                        self.graphs[lc][nb] = self.select_neighbors_heuristic(
-                            self.vectors[nb], nb_candidates, M_layer
-                        )
-                    else:
-                        self.graphs[lc][nb] = self.select_neighbors_simple(
-                            nb_candidates, M_layer
-                        )
-
-            # carry best candidates down as entry points for next layer
-            ep = [nid for _, nid in results]
-
-        # if new node was promoted above current max, it becomes the new entry point
-        if node_layer > self.max_layer:
-            self.max_layer = node_layer
-            self.entry_point = node_id
-
-        return node_id
-
-    # ------------------------------------------------------------------
-    # Query
-    # ------------------------------------------------------------------
-
-    def query(self, vector, k=10, ef_search=None):
-        if self.entry_point is None:
-            return []
-
-        if ef_search is None:
-            ef_search = max(k, self.ef_construction // 2)
-        ef_search = max(ef_search, k)
-
-        vector = np.array(vector, dtype=np.float32)
-        ep = [self.entry_point]
-
-        # phase 1: fast descent from top layer to layer 1
-        for lc in range(self.max_layer, 0, -1):
-            results = self.search_layer(vector, ep, ef=1, layer=lc)
-            ep = [results[0][1]]
-
-        # phase 2: full beam search at layer 0
-        results = self.search_layer(vector, ep, ef=ef_search, layer=0)
-
-        return results[:k]
-
-    # ------------------------------------------------------------------
-    # Diagnostics
-    # ------------------------------------------------------------------
-
-    def stats(self):
-        n = len(self.vectors)
-        layer_counts = [len(g) for g in self.graphs]
-        avg_degree = [
-            round(float(np.mean([len(nb) for nb in g.values()])), 2) if g else 0
-            for g in self.graphs
-        ]
-        return {
-            "n_vectors": n,
-            "max_layer": self.max_layer,
-            "entry_point": self.entry_point,
-            "nodes_per_layer": layer_counts,
-            "avg_degree_per_layer": avg_degree,
-        }
+    r = run(data, q, k=10, metric="l2", gt=gt)
+    print(r)
