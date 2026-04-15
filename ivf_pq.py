@@ -78,14 +78,14 @@ def run(
 
     # ── Build ──────────────────────────────────────────────────────────────────
     t0 = time.perf_counter()
-    index = ivf_pq.build(params, d_data, handle=res)
+    index = ivf_pq.build(params, d_data, resources=res)
     cp.cuda.Stream.null.synchronize()
     build_s = time.perf_counter() - t0
 
     # ── Search ─────────────────────────────────────────────────────────────────
     sp = ivf_pq.SearchParams(n_probes=n_probes)
     t0 = time.perf_counter()
-    _, labels = ivf_pq.search(sp, index, d_queries, k, handle=res)
+    _, labels = ivf_pq.search(sp, index, d_queries, k, resources=res)
     cp.cuda.Stream.null.synchronize()
     query_s = time.perf_counter() - t0
 

@@ -69,14 +69,14 @@ def run(
 
     # ── Build ──────────────────────────────────────────────────────────────────
     t0 = time.perf_counter()
-    index = cagra.build(params, d_data, handle=res)
+    index = cagra.build(params, d_data, resources=res)
     cp.cuda.Stream.null.synchronize()
     build_s = time.perf_counter() - t0
 
     # ── Search ─────────────────────────────────────────────────────────────────
     sp = cagra.SearchParams(itopk_size=itopk_size)
     t0 = time.perf_counter()
-    _, labels = cagra.search(sp, index, d_queries, k, handle=res)
+    _, labels = cagra.search(sp, index, d_queries, k, resources=res)
     cp.cuda.Stream.null.synchronize()
     query_s = time.perf_counter() - t0
 

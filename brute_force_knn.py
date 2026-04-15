@@ -67,13 +67,13 @@ def _run_cuvs(data, queries, k, metric, gt):
 
     # ── Build (transfer + index creation) ─────────────────────────────────────
     t0 = time.perf_counter()
-    index = brute_force.build(d_data, metric=metric_str, handle=res)
+    index = brute_force.build(d_data, metric=metric_str, resources=res)
     cp.cuda.Stream.null.synchronize()
     build_s = time.perf_counter() - t0
 
     # ── Search ─────────────────────────────────────────────────────────────────
     t0 = time.perf_counter()
-    _, labels = brute_force.search(index, d_queries, k, handle=res)
+    _, labels = brute_force.search(index, d_queries, k, resources=res)
     cp.cuda.Stream.null.synchronize()
     query_s = time.perf_counter() - t0
 
