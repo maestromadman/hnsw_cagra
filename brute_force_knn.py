@@ -78,6 +78,7 @@ def _run_cuvs(data, queries, k, metric, gt):
     query_s = time.perf_counter() - t0
 
     labels_np = cp.asnumpy(labels).astype(np.int32)
+    del index, d_data, d_queries, res       # force dealloc before interpreter shutdown
     n, dim    = data.shape
 
     return {

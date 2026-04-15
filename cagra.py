@@ -81,6 +81,7 @@ def run(
     query_s = time.perf_counter() - t0
 
     labels_np = cp.asnumpy(labels).astype(np.int32)
+    del index, sp, d_data, d_queries, res   # force dealloc before interpreter shutdown
 
     # Memory: graph edges (uint32) + raw vectors
     n, dim = data.shape

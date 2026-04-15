@@ -90,6 +90,7 @@ def run(
     query_s = time.perf_counter() - t0
 
     labels_np = cp.asnumpy(labels).astype(np.int32)
+    del index, sp, d_data, d_queries, res   # force dealloc before interpreter shutdown
 
     # Memory: PQ codes — each vector is compressed to pq_dim * pq_bits bits
     mem_mb = n * actual_pq * pq_bits / 8 / 1024 ** 2
