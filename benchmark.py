@@ -36,7 +36,7 @@ import brute_force_knn
 # CONFIG — edit these to change the benchmark
 # ──────────────────────────────────────────────────────────────────────────────
 
-N_VECTORS  = 10_000   # total vectors in the index
+N_VECTORS  = 1_000_000   # total vectors in the index
 DIM        = 128      # vector dimensionality
 N_QUERIES  = 500      # number of query vectors
 K          = 10       # k for k-NN
