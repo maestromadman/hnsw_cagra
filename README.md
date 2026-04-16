@@ -1,17 +1,16 @@
 # Vector Search Benchmark: HNSW vs cuVS GPU Methods
 
 A structured benchmarking framework comparing five vector search algorithms across
-multiple real-world scenarios — built to evaluate where GPU-accelerated search
+multiple real-world scenarios, built to evaluate where GPU-accelerated search
 (NVIDIA cuVS) meaningfully outperforms CPU-based alternatives (hnswlib).
 
 ---
 
 ## Motivation
 
-Vector search is the backbone of modern AI applications: **Retrieval-Augmented
-Generation (RAG)**, semantic search, recommendation engines, and multimodal
-pipelines all depend on finding the nearest neighbours of an embedding vector
-across a large corpus — fast and accurately.
+Vector search is the backbone of modern AI applications such as RAG, semantic search, recommendation engines, and multimodal
+pipelines: they all depend on quickly and accurately locating the nearest neighbours of an embedding vector
+across a large corpus.
 
 The dominant open-source CPU solution is **hnswlib** (HNSW algorithm), widely
 used in production today. NVIDIA's **cuVS** library offers GPU-accelerated
@@ -19,7 +18,7 @@ alternatives (IVF-Flat, IVF-PQ, CAGRA, Brute-Force) that promise higher
 throughput at scale. The question this project answers:
 
 > **At what scale, dimensionality, and query pattern does it make sense for a
-> customer to move from CPU-based HNSW to GPU-accelerated cuVS — and which
+> customer to move from CPU-based HNSW to GPU-accelerated cuVS and which
 > cuVS algorithm should they choose?**
 
 ---
@@ -47,7 +46,7 @@ All five algorithms run on **identical data** per configuration:
 
 - Randomly generated float32 vectors (seeded for reproducibility)
 - Same corpus, same query set, same k, same distance metric
-- Ground truth computed via GPU brute-force (fast, memory-safe at any scale)
+- Ground truth computed via GPU brute-force
 - Recall measured as Recall@k against that ground truth
 
 **Metrics captured per algorithm:**
@@ -59,7 +58,7 @@ All five algorithms run on **identical data** per configuration:
 | **Recall@k** | Fraction of true top-k neighbours returned — search quality |
 | **Est. memory (MB)** | Index size on disk/GPU — infrastructure cost |
 
-**Three charts per run** frame results around real customer scenarios:
+**Three charts per run** frame results around hypothetical customer scenarios:
 
 1. **Index Build Time + Memory** — *"How expensive is it to index my data?"*
 2. **Queries per Second** — *"Can it handle my traffic?"*
@@ -83,22 +82,22 @@ Seven configurations test different dimensions of the problem:
 
 ---
 
-## Key Results & Customer Takeaways
+## Key Results & "Customer" Takeaways
 
 ### Run 1 — Baseline (n=10k)
 At small scale, brute-force GPU dominates and all methods are fast. This is
-intentional — it establishes that **at small N, no index is needed**. HNSW
-build time is already 25× slower than any cuVS method even here.
+intentiona and establishes that **at small N, no index is needed**. HNSW
+build time is already 25× slower than any cuVS method.
 
-**Takeaway:** Small corpora don't need cuVS. The value case starts at scale.
+**Takeaway:** Small corpora don't need cuVS. Value comes with scale.
 
 ---
 
 ### Run 2 — GPU at Scale (n=1M)
-This is the core result. HNSW build time grows to **~5 minutes** at 1M vectors.
+This is a core result. HNSW build time grows to **~5 minutes** at 1M vectors.
 CAGRA builds in **~40 seconds** and reaches **~109k QPS** — roughly 8× HNSW's
 throughput. Brute-force QPS collapses from 583k (at 10k) to ~10k, confirming
-that exhaustive search does not scale.
+the trivial result that exhaustive search does not scale.
 
 **Takeaway:** For customers with >100k vectors and throughput requirements,
 CAGRA is the clear recommendation. The build time advantage alone can change
@@ -109,12 +108,12 @@ a customer's re-indexing cadence from hours to minutes.
 ### Run 3 — High Dimensions (dim=1,536, OpenAI embedding size)
 At real-world embedding dimensions, memory becomes the constraint.
 IVF-Flat and Brute-Force each need ~586 MB just for raw vectors.
-**IVF-PQ** compresses to **73 MB** — an 8× reduction — while still returning
+**IVF-PQ** compresses to **73 MB** (8× reduction) while still returning
 useful candidates for a downstream re-ranker.
 
-**Takeaway:** For customers using large embedding models (OpenAI, Cohere,
-text-embedding-3-large), IVF-PQ is the practical choice when GPU VRAM is
-limited. Accept slightly lower recall in exchange for fitting a much larger
+**Takeaway:** For customers using large embedding models (OpenAI, Cohere, etc.), 
+IVF-PQ is the practical choice when GPU VRAM is limited. 
+Accept slightly lower recall in exchange for fitting a much larger
 corpus on-device.
 
 ---
@@ -213,11 +212,11 @@ python brute_force_knn.py   # cuVS Brute-Force (GPU) or NumPy (CPU fallback)
 
 ```
 benchmark.py        — Orchestrator: runs all configs, generates charts
-hnsw.py             — hnswlib CPU HNSW wrapper
-ivf_flat.py         — cuVS IVF-Flat GPU wrapper
-ivf_pq.py           — cuVS IVF-PQ GPU wrapper
-cagra.py            — cuVS CAGRA GPU wrapper
-brute_force_knn.py  — cuVS Brute-Force GPU wrapper (NumPy CPU fallback)
+hnsw.py             — hnswlib CPU HNSW
+ivf_flat.py         — cuVS IVF-Flat GPU
+ivf_pq.py           — cuVS IVF-PQ GPU 
+cagra.py            — cuVS CAGRA GPU 
+brute_force_knn.py  — cuVS Brute-Force GPU (NumPy CPU fallback)
 results/            — Saved benchmark PNGs
 ```
 
@@ -239,7 +238,7 @@ results/            — Saved benchmark PNGs
 
 ## Environment
 
-- **GPU:** NVIDIA (tested on GCP VM with CUDA 12)
+- **GPU:** NVIDIA L4 (tested on GCP VM with CUDA 12.4)
 - **cuVS:** RAPIDS cuVS (cuvs-env)
 - **Python:** 3.10
 - **Key packages:** `cuvs`, `cupy`, `hnswlib`, `numpy`, `matplotlib`
