@@ -74,7 +74,9 @@ def run(
     build_s = time.perf_counter() - t0
 
     # ── Search ─────────────────────────────────────────────────────────────────
-    sp = cagra.SearchParams(itopk_size=itopk_size)
+    # CAGRA requires itopk_size >= k — auto-bump silently if needed
+    effective_itopk = max(itopk_size, k)
+    sp = cagra.SearchParams(itopk_size=effective_itopk)
     t0 = time.perf_counter()
     _, labels = cagra.search(sp, index, d_queries, k, resources=res)
     cp.cuda.Stream.null.synchronize()
