@@ -33,6 +33,8 @@ CONTROLS = {
     "k":         10,
 }
 
+
+
 N_LISTS      = 1024
 N_PROBES     = 64
 PQ_BITS      = 8
@@ -49,11 +51,11 @@ INDEX_COLORS = {
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def f32(a: np.ndarray) -> np.ndarray:
+def _f32(a: np.ndarray) -> np.ndarray:
     return np.ascontiguousarray(a, dtype=np.float32)
 
 
-def free_gpu():
+def _free_gpu():
     """Release cupy memory pool blocks back to the GPU allocator."""
     try:
         import cupy as cp
@@ -63,7 +65,7 @@ def free_gpu():
         pass
 
 
-def compute_ground_truth(vectors: np.ndarray, queries: np.ndarray, k: int) -> np.ndarray:
+def _compute_ground_truth(vectors: np.ndarray, queries: np.ndarray, k: int) -> np.ndarray:
     """
     Exact k-NN ground truth via cuVS GPU brute-force.
     Falls back to chunked NumPy CPU if GPU is unavailable or OOMs.
