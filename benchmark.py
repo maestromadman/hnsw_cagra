@@ -40,7 +40,7 @@ import brute_force_knn
 #   RUN_ALL = True  → loop through all EXPERIMENT_RUNS below (one PNG each)
 #   RUN_ALL = False → run only SINGLE_RUN config below
 # ──────────────────────────────────────────────────────────────────────────────
-RUN_ALL = True
+RUN_ALL = FALSE
 
 # ──────────────────────────────────────────────────────────────────────────────
 # EXPERIMENT RUNS  (only used when RUN_ALL = True)
