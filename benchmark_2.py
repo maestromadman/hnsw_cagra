@@ -35,11 +35,11 @@ CONTROLS = {
 
 
 
-N_LISTS      = 1024
-N_PROBES     = 64
+N_LISTS      = 256   # sqrt(65536); smaller lists → more vectors/cluster → better locality
+N_PROBES     = 64   # now probes 25% of clusters (64/256) — much better recall on random data
 PQ_BITS      = 8
 GRAPH_DEGREE = 64
-ITOPK_SIZE   = 64
+ITOPK_SIZE   = 128  # wider beam search for CAGRA; 64 was too narrow in 768-dim random space
 
 INDEX_TYPES  = ["IVF-Flat", "IVF-PQ", "CAGRA"]
 INDEX_COLORS = {
