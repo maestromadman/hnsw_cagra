@@ -14,6 +14,8 @@ Runs 4 experiments, each varying one parameter while holding others fixed:
 Output: exp_{param}.png per experiment + a summary table to stdout.
 """
 
+import gc
+import ctypes
 import time
 import numpy as np
 import matplotlib
@@ -61,6 +63,15 @@ def _free_gpu():
         import cupy as cp
         cp.get_default_memory_pool().free_all_blocks()
         cp.get_default_pinned_memory_pool().free_all_blocks()
+    except Exception:
+        pass
+
+
+def _free_cpu():
+    """Run GC and tell libc to return free pages to the OS."""
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
     except Exception:
         pass
 
@@ -241,6 +252,7 @@ def run_experiment(vary_param: str, values: list, controls: dict,
     results = {idx: [] for idx in INDEX_TYPES}
 
     for v in values:
+        vectors = queries = gt = None  # ensure del at end of iteration is always safe
         n_vectors = v if vary_param == "n_vectors" else controls["n_vectors"]
         dim       = v if vary_param == "dim"       else controls["dim"]
         n_queries = v if vary_param == "n_queries" else controls["n_queries"]
@@ -307,6 +319,11 @@ def run_experiment(vary_param: str, values: list, controls: dict,
                 )
                 results[idx_type].append({"value": v, "qps": None, "recall": None, "error": str(e)})
                 _free_gpu()
+
+        # Release the corpus and GT from CPU RAM before the next data point
+        del vectors, queries, gt
+        _free_cpu()
+        _free_gpu()
 
     return {
         "vary_param": vary_param,
@@ -473,6 +490,8 @@ def main():
         )
         plot_experiment(exp_results, param)
         all_results.append(exp_results)
+        _free_cpu()
+        _free_gpu()
 
     _print_summary(all_results)
     print("\nAll 4 experiments complete.")
