@@ -1,0 +1,14 @@
+# Embedding data — too large for git (3+ GB per dim variant)
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
