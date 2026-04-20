@@ -32,8 +32,8 @@ BATCH     = 512                         # encode batch size; tune down if GPU OO
 os.makedirs(OUTDIR, exist_ok=True)
 
 # ── 1. Stream Wikipedia passages ───────────────────────────────────────────────
-print("Streaming Wikipedia (20220301.en) — collecting passages...")
-ds = load_dataset("wikipedia", "20220301.en", split="train", streaming=True)
+print("Streaming Wikipedia (wikimedia/wikipedia 20231101.en) — collecting passages...")
+ds = load_dataset("wikimedia/wikipedia", "20231101.en", split="train", streaming=True)
 
 n_need  = N_CORPUS + N_QUERIES
 texts   = []
