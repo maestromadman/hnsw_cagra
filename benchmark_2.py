@@ -76,10 +76,10 @@ def _check_vram(n_vectors: int, dim: int, n_queries: int):
     import cupy as cp
     free_bytes, _total = cp.cuda.runtime.memGetInfo()
     budget = free_bytes * _VRAM_SAFETY
-    # IVF-Flat is worst case: keeps full float32 vectors in GPU memory
+    # IVF-Flat worst case: raw data + index copy + GT scratch + cupy pool slack
     corpus_bytes  = n_vectors * dim * 4
     queries_bytes = n_queries * dim * 4
-    estimated     = 3 * corpus_bytes + queries_bytes
+    estimated     = 4 * corpus_bytes + queries_bytes
     if estimated > budget:
         gb = lambda b: b / 1024**3
         raise RuntimeError(
@@ -454,7 +454,7 @@ def _print_summary(all_results: list):
 
 def main():
     experiments = [
-        ("n_vectors", [100_000, 500_000, 1_000_000, 2_000_000]),
+        ("n_vectors", [100_000, 250_000, 500_000, 750_000, 1_000_000]),
         ("dim",       [128, 256, 384, 512, 768, 1024]),
         ("n_queries", [100, 500, 1_000, 5_000, 10_000]),
         ("k",         [1, 5, 10, 50, 100]),
