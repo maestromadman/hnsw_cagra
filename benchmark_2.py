@@ -65,41 +65,48 @@ def _free_gpu():
         pass
 
 
+_VRAM_SAFETY = 0.80  # use at most 80% of free VRAM per data point
+
+def _check_vram(n_vectors: int, dim: int, n_queries: int):
+    """
+    Raise RuntimeError if the estimated peak VRAM for this data point exceeds
+    the safety budget.  Estimation: 3× raw corpus bytes (data + IVF-Flat index
+    copy + GT distance scratch) + queries.
+    """
+    import cupy as cp
+    free_bytes, _total = cp.cuda.runtime.memGetInfo()
+    budget = free_bytes * _VRAM_SAFETY
+    # IVF-Flat is worst case: keeps full float32 vectors in GPU memory
+    corpus_bytes  = n_vectors * dim * 4
+    queries_bytes = n_queries * dim * 4
+    estimated     = 3 * corpus_bytes + queries_bytes
+    if estimated > budget:
+        gb = lambda b: b / 1024**3
+        raise RuntimeError(
+            f"Estimated peak VRAM {gb(estimated):.1f} GB exceeds "
+            f"safety budget {gb(budget):.1f} GB "
+            f"(free {gb(free_bytes):.1f} GB) — skipping"
+        )
+
+
 def _compute_ground_truth(vectors: np.ndarray, queries: np.ndarray, k: int) -> np.ndarray:
-    """
-    Exact k-NN ground truth via cuVS GPU brute-force.
-    Falls back to chunked NumPy CPU if GPU is unavailable or OOMs.
-    """
+    """Exact k-NN ground truth via cuVS GPU brute-force (GPU only)."""
     print("    [GT] computing ground truth...", end=" ", flush=True)
     t0 = time.perf_counter()
-    try:
-        import cupy as cp
-        from cuvs.neighbors import brute_force
-        from cuvs.common import Resources
+    import cupy as cp
+    from cuvs.neighbors import brute_force
+    from cuvs.common import Resources
 
-        res    = Resources()
-        d_data = cp.asarray(vectors)
-        d_q    = cp.asarray(queries)
-        bf_idx = brute_force.build(d_data, metric="sqeuclidean", resources=res)
-        _, lbl = brute_force.search(bf_idx, d_q, k, resources=res)
-        cp.cuda.Stream.null.synchronize()
-        gt = cp.asnumpy(lbl).astype(np.int32)
-        del bf_idx, d_data, d_q, res
-        _free_gpu()
-        print(f"GPU ({time.perf_counter() - t0:.2f}s)")
-        return gt
-
-    except Exception as gpu_err:
-        print(f"GPU failed ({gpu_err}), falling back to CPU...", end=" ", flush=True)
-
-    # Chunked CPU: one query at a time to keep memory bounded
-    rows = []
-    for i in range(len(queries)):
-        d   = np.sum((queries[i] - vectors) ** 2, axis=-1)
-        idx = np.argpartition(d, k)[:k]
-        rows.append(idx[np.argsort(d[idx])])
-    gt = np.array(rows, dtype=np.int32)
-    print(f"CPU ({time.perf_counter() - t0:.2f}s)")
+    res    = Resources()
+    d_data = cp.asarray(vectors)
+    d_q    = cp.asarray(queries)
+    bf_idx = brute_force.build(d_data, metric="sqeuclidean", resources=res)
+    _, lbl = brute_force.search(bf_idx, d_q, k, resources=res)
+    cp.cuda.Stream.null.synchronize()
+    gt = cp.asnumpy(lbl).astype(np.int32)
+    del bf_idx, d_data, d_q, res
+    _free_gpu()
+    print(f"GPU ({time.perf_counter() - t0:.2f}s)")
     return gt
 
 
@@ -240,6 +247,15 @@ def run_experiment(vary_param: str, values: list, controls: dict,
         k         = v if vary_param == "k"         else controls["k"]
 
         # Fresh generator each data point for reproducibility regardless of loop order
+        # VRAM pre-check — skip before allocating anything if it won't fit
+        try:
+            _check_vram(n_vectors, dim, n_queries)
+        except RuntimeError as e:
+            print(f"  [SKIP] {vary_param}={v}: {e}")
+            for idx_type in INDEX_TYPES:
+                results[idx_type].append({"value": v, "qps": None, "recall": None, "error": str(e)})
+            continue
+
         rng     = np.random.default_rng(SEED)
         vectors = _f32(rng.standard_normal((n_vectors, dim)))
         queries = _f32(rng.standard_normal((n_queries, dim)))
@@ -248,7 +264,7 @@ def run_experiment(vary_param: str, values: list, controls: dict,
         try:
             gt = _compute_ground_truth(vectors, queries, k)
         except Exception as e:
-            msg = f"GT computation failed: {e}"
+            msg = f"GT failed: {e}"
             print(f"  [GT FAIL] {vary_param}={v}: {msg} — skipping all indexes")
             for idx_type in INDEX_TYPES:
                 results[idx_type].append({"value": v, "qps": None, "recall": None, "error": msg})
@@ -438,7 +454,7 @@ def _print_summary(all_results: list):
 
 def main():
     experiments = [
-        ("n_vectors", [100_000, 500_000, 1_000_000, 2_000_000, 5_000_000]),
+        ("n_vectors", [100_000, 500_000, 1_000_000, 2_000_000]),
         ("dim",       [128, 256, 384, 512, 768, 1024]),
         ("n_queries", [100, 500, 1_000, 5_000, 10_000]),
         ("k",         [1, 5, 10, 50, 100]),
