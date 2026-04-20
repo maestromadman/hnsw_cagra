@@ -38,7 +38,8 @@ CONTROLS = {
 
 
 N_LISTS      = 256   # sqrt(65536); smaller lists → more vectors/cluster → better locality
-N_PROBES     = 64   # now probes 25% of clusters (64/256) — much better recall on random data
+N_PROBES     = 64   # probes 25% of clusters for IVF-Flat
+N_PROBES_PQ  = 192  # IVF-PQ needs ~3× more probes to compensate for PQ distance approximation error
 PQ_BITS      = 8
 GRAPH_DEGREE = 64
 ITOPK_SIZE   = 128  # wider beam search for CAGRA; 64 was too narrow in 768-dim random space
@@ -158,7 +159,7 @@ def build_index(index_type: str, vectors: np.ndarray, **kwargs) -> dict:
     elif index_type == "IVF-PQ":
         from cuvs.neighbors import ivf_pq as _mod
         n_lists  = kwargs.get("n_lists",  N_LISTS)
-        n_probes = kwargs.get("n_probes", N_PROBES)
+        n_probes = kwargs.get("n_probes", N_PROBES_PQ)
         pq_bits  = kwargs.get("pq_bits",  PQ_BITS)
         # pq_dim = dim // 8: ~8× compression; always ≤ dim for dim ≥ 8
         pq_dim   = kwargs.get("pq_dim",   max(1, dim // 8))
@@ -467,9 +468,42 @@ def _print_summary(all_results: list):
     print(sep)
 
 
+# ── Sanity check ───────────────────────────────────────────────────────────────
+
+def sanity_check():
+    """
+    Tiny smoke-test: n=5000, dim=64, k=10.
+    IVF-Flat with 75% probing on small data should give recall ≥ 0.95.
+    Prints a clear PASS/FAIL so we know the pipeline is correct before
+    running the full benchmark.
+    """
+    print("Running sanity check...", flush=True)
+    rng  = np.random.default_rng(0)
+    vecs = _f32(rng.standard_normal((5_000, 64)))
+    qrys = _f32(rng.standard_normal((100,  64)))
+    k    = 10
+
+    gt = _compute_ground_truth(vecs, qrys, k)
+    handle = build_index("IVF-Flat", vecs, n_lists=32, n_probes=24)  # 75% probing
+    approx, _ = query_index(handle, qrys, k)
+    recall = compute_recall(approx, gt)
+
+    del handle, approx, vecs, qrys, gt
+    _free_gpu()
+    _free_cpu()
+
+    status = "PASS" if recall >= 0.95 else "FAIL"
+    print(f"Sanity check [{status}]: IVF-Flat recall={recall:.4f} "
+          f"(expected ≥ 0.95 on tiny data with 75% probing)\n")
+    if status == "FAIL":
+        raise RuntimeError("Sanity check failed — recall pipeline is broken, aborting.")
+
+
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 def main():
+    sanity_check()
+
     experiments = [
         ("n_vectors", [100_000, 250_000, 500_000, 750_000, 1_000_000]),
         ("dim",       [128, 256, 384, 512, 768]),
