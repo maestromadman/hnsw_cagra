@@ -14,9 +14,21 @@ Output:  exp_pareto.png
 
 import time
 import numpy as np
+import rmm
+import cupy as cp
+from rmm.allocators.cupy import rmm_cupy_allocator
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+# ── RMM pool allocator ────────────────────────────────────────────────────────
+# Pre-allocate a managed pool so cupy and cuVS share one allocator.
+# This prevents fragmentation when building multiple indexes back-to-back.
+rmm.reinitialize(
+    pool_allocator=True,
+    initial_pool_size=4 * 1024 ** 3,   # 4 GB starting pool on L4
+)
+cp.cuda.set_allocator(rmm_cupy_allocator)
 
 from benchmark_2 import (
     _free_gpu, _free_cpu,
