@@ -7,6 +7,7 @@ _log_fh = None
 
 def start_logging(filepath: str):
     global _proc, _log_fh
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
     _log_fh = open(filepath, "w")
     _proc = subprocess.Popen(
         ["sudo", "dcgmi", "dmon", "--host", "127.0.0.1:5555",
