@@ -33,7 +33,7 @@ K         = 10
 # Quality knobs to sweep (low → high quality)
 IVF_FLAT_PROBES = [1, 4, 8, 16, 32, 64, 128, 192, 256]
 IVF_PQ_PROBES   = [1, 4, 8, 16, 32, 64, 128, 192, 256]
-CAGRA_ITOPK     = [32, 48, 64, 96, 128, 192, 256]
+CAGRA_ITOPK     = [32, 64, 96, 128, 160, 192, 256]
 
 # pq_dim values to compare: dim//16, dim//8, dim//4, dim//2
 IVF_PQ_DIMS     = [48, 96, 192, 384]
@@ -192,6 +192,10 @@ def main():
         _free_gpu()
 
     # ── CAGRA ─────────────────────────────────────────────────────────────────
+    # Full device sync to clear any leftover GPU state from IVF-PQ memory churn
+    cp.cuda.Device().synchronize()
+    _free_gpu()
+
     print("\nBuilding CAGRA (slowest step)...")
     from cuvs.neighbors import cagra
     res    = Resources()
