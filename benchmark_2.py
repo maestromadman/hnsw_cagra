@@ -14,7 +14,6 @@ Runs 4 experiments, each varying one parameter while holding others fixed:
 Output: exp_{param}.png per experiment + a summary table to stdout.
 """
 
-import argparse
 import gc
 import ctypes
 import os
@@ -267,7 +266,7 @@ def compute_recall(approx_indices: np.ndarray, true_indices: np.ndarray) -> floa
 # ── Experiment runner ──────────────────────────────────────────────────────────
 
 def run_experiment(vary_param: str, values: list, controls: dict,
-                   exp_num: int = 0, n_exps: int = 4, dcgm: bool = False) -> dict:
+                   exp_num: int = 0, n_exps: int = 4) -> dict:
     """
     Vary *vary_param* across *values*, holding all other params at *controls*.
 
@@ -286,10 +285,6 @@ def run_experiment(vary_param: str, values: list, controls: dict,
         results     : {index_type: [{"value", "qps", "recall"} | {"value", "error"}]}
     """
     results = {idx: [] for idx in INDEX_TYPES}
-
-    if dcgm:
-        from dcgm_logger import write_marker
-        write_marker("results/dcgm_raw.csv", f"exp_{vary_param}|START")
 
     for v in values:
         vectors = queries = gt = None  # ensure del at end of iteration is always safe
@@ -322,9 +317,6 @@ def run_experiment(vary_param: str, values: list, controls: dict,
             continue
 
         for idx_type in INDEX_TYPES:
-            if dcgm:
-                from dcgm_logger import write_marker
-                write_marker("results/dcgm_raw.csv", f"exp_{vary_param}|{vary_param}={v}|{idx_type}")
             try:
                 # CAGRA: itopk_size must be >= k (constraint documented in cuVS)
                 kw = {}
@@ -542,46 +534,33 @@ def sanity_check():
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="cuVS ANN benchmark")
-    parser.add_argument("--dcgm", action="store_true", help="Enable DCGM logging")
-    args = parser.parse_args()
+    sanity_check()
 
-    if args.dcgm:
-        from dcgm_logger import start_logging
-        start_logging("results/dcgm_raw.csv")
+    experiments = [
+        ("n_vectors", [100_000, 250_000, 500_000, 750_000, 1_000_000]),
+        ("dim",       [128, 256, 384, 512, 768]),
+        ("n_queries", [100, 500, 1_000, 5_000, 10_000]),
+        ("k",         [1, 5, 10, 50, 100]),
+    ]
 
-    try:
-        sanity_check()
+    all_results = []
+    for i, (param, values) in enumerate(experiments, 1):
+        ctrl_display = {p: v for p, v in CONTROLS.items() if p != param}
+        print(f"\n{'=' * 64}")
+        print(f"Experiment {i}/4: varying {param}")
+        print(f"  Controls: {ctrl_display}")
+        print(f"{'=' * 64}")
 
-        experiments = [
-            ("n_vectors", [100_000, 250_000, 500_000, 750_000, 1_000_000]),
-            ("dim",       [128, 256, 384, 512, 768]),
-            ("n_queries", [100, 500, 1_000, 5_000, 10_000]),
-            ("k",         [1, 5, 10, 50, 100]),
-        ]
+        exp_results = run_experiment(
+            param, values, CONTROLS, exp_num=i, n_exps=4
+        )
+        plot_experiment(exp_results, param)
+        all_results.append(exp_results)
+        _free_cpu()
+        _free_gpu()
 
-        all_results = []
-        for i, (param, values) in enumerate(experiments, 1):
-            ctrl_display = {p: v for p, v in CONTROLS.items() if p != param}
-            print(f"\n{'=' * 64}")
-            print(f"Experiment {i}/4: varying {param}")
-            print(f"  Controls: {ctrl_display}")
-            print(f"{'=' * 64}")
-
-            exp_results = run_experiment(
-                param, values, CONTROLS, exp_num=i, n_exps=4, dcgm=args.dcgm
-            )
-            plot_experiment(exp_results, param)
-            all_results.append(exp_results)
-            _free_cpu()
-            _free_gpu()
-
-        _print_summary(all_results)
-        print("\nAll 4 experiments complete.")
-    finally:
-        if args.dcgm:
-            from dcgm_logger import stop_logging
-            stop_logging()
+    _print_summary(all_results)
+    print("\nAll 4 experiments complete.")
 
 
 if __name__ == "__main__":
