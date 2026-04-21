@@ -18,13 +18,13 @@ in production today. NVIDIA's **cuVS** library offers GPU-accelerated alternativ
 that promise higher throughput at scale. This project answers:
 
 > **At what scale, dimensionality, and query pattern does it make sense to move from
-> CPU-based HNSW to GPU-accelerated cuVS — and which cuVS algorithm should you choose?**
+> CPU-based HNSW to GPU-accelerated cuVS. Which cuVS algorithm should you choose?**
 
 ---
 
 ## Hardware & Environment
 
-- **GPU:** NVIDIA L4 (24 GB VRAM, GCP VM)
+- **GPU:** NVIDIA L4 (24 GB VRAM, GCP VM) - (This was what was within my budget for this project; I hope to explore the use of multiple GPUs in the near future)
 - **CUDA:** 12.4
 - **cuVS:** RAPIDS cuVS (conda env `cuvs-env-new`)
 - **Python:** 3.10
