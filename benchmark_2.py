@@ -402,14 +402,23 @@ def plot_experiment(exp_results: dict, vary_param: str):
 
         for x, y, r in zip(xs, ys, rs):
             ax.annotate(
-                f"{r:.2f}",
+                f"R={r:.2f}",
                 (x, y),
                 textcoords="offset points",
                 xytext=(0, 10),
                 ha="center",
-                fontsize=8.5,
+                fontsize=8,
                 color=color,
                 fontweight="bold",
+            )
+            ax.annotate(
+                f"{int(y):,}",
+                (x, y),
+                textcoords="offset points",
+                xytext=(0, -14),
+                ha="center",
+                fontsize=7.5,
+                color=color,
             )
 
     param_label = vary_param.replace("_", " ").title()
