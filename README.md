@@ -40,7 +40,7 @@ that promise higher throughput at scale. This project answers:
 | **IVF-Flat** (cuVS) | Inverted index, exact within cluster | GPU | Near-perfect recall, QPS degrades at scale |
 | **IVF-PQ** (cuVS) | Inverted index + product quantization | GPU | Highest raw throughput, recall capped by compression |
 | **CAGRA** (cuVS) | GPU-optimized graph ANN | GPU | Best throughput + recall simultaneously |
-| **Brute-Force** (cuVS) | Exhaustive exact search | GPU | Perfect recall, O(N) — ground truth baseline only |
+| **Brute-Force** (cuVS) | Exhaustive exact search | GPU | Perfect recall, O(N), ground truth baseline only |
 
 ---
 
@@ -56,13 +56,13 @@ distance metric. Key results:
 methods are competitive. HNSW build time is already 25× slower than any cuVS method.
 
 **Run 2 (n=1M, large scale):** The core result. HNSW build time grows to ~5 minutes.
-CAGRA builds in ~40 seconds and reaches ~109k QPS — roughly 8× HNSW's throughput.
+CAGRA builds in ~40 seconds and reaches ~109k QPS (roughly 8× HNSW's throughput).
 
 **Run 4 (n_queries=1, real-time):** GPU launch overhead dominates at batch size 1.
-HNSW wins here — CPU graph traversal has near-zero overhead per query. cuVS is
+HNSW wins here, as CPU graph traversal has near-zero overhead per query. cuVS is
 optimised for throughput, not single-query latency.
 
-**Run 5 (n_queries=10k, batch):** CAGRA reaches 687k QPS — over 30× HNSW's 22k.
+**Run 5 (n_queries=10k, batch):** CAGRA reaches 687k QPS (over 30× HNSW's 22k).
 Any customer running batch inference or sustained high-RPS serving should be on cuVS.
 
 **Run 3 (dim=1536, OpenAI embedding size):** IVF-PQ compresses to 73 MB (8×
@@ -74,7 +74,7 @@ downstream re-ranker.
 ### benchmark_2.py — Parametric Sweep with Real Embeddings
 
 Four experiments each vary one parameter while holding others fixed at:
-`n_vectors=1M, dim=768, n_queries=1000, k=10` — a realistic e-commerce semantic
+`n_vectors=1M, dim=768, n_queries=1000, k=10`, a realistic e-commerce semantic
 search scenario using sentence-transformer embeddings (dim=768).
 
 **Experiment 1 — Varying corpus size (100K → 1M vectors)**
@@ -83,9 +83,9 @@ search scenario using sentence-transformer embeddings (dim=768).
 
 | Index | 100K vectors | 1M vectors | Trend |
 |---|---|---|---|
-| IVF-Flat | 4,887 QPS | 367 QPS | −92% — collapses with scale |
+| IVF-Flat | 4,887 QPS | 367 QPS | −92%, collapses with scale |
 | IVF-PQ | 3,920 QPS | 4,892 QPS | Roughly flat |
-| CAGRA | 6,312 QPS | 13,627 QPS | **+116% — improves with scale** |
+| CAGRA | 6,312 QPS | 13,627 QPS | **+116%, improves with scale** |
 
 CAGRA's QPS *increases* as the corpus grows because its graph traversal parallelises
 better as the index fills GPU memory. IVF-Flat becomes memory-bandwidth bound at scale.
@@ -105,7 +105,7 @@ better distance approximation.
 
 ![QPS vs N Queries](exp_n_queries.png)
 
-CAGRA scales almost perfectly linearly with batch size — 140,000 QPS at 10K queries —
+CAGRA scales almost perfectly linearly with batch size (140,000 QPS at 10K queries),
 because each query maps to independent GPU threads. IVF-Flat barely moves (389 →
 3,645 QPS). This is the most dramatic plot in the project and the strongest
 argument for GPU adoption in high-traffic serving.
@@ -124,7 +124,7 @@ cross-encoder re-scores the retrieved candidates.
 ### benchmark_3.py — Recall-QPS Pareto Frontier
 
 Builds each index once at fixed scale (500K vectors, dim=768, k=10, 500 queries),
-then sweeps the quality knob — n_probes for IVF indexes, itopk_size for CAGRA —
+then sweeps the quality knob (n_probes for IVF indexes, itopk_size for CAGRA)
 to trace the full speed-accuracy tradeoff curve. IVF-PQ is run at four compression
 levels to show how the quantization ceiling changes with pq_dim.
 
@@ -135,12 +135,12 @@ levels to show how the quantization ceiling changes with pq_dim.
 throughput.
 
 **CAGRA** sits in the top-right corner: 29,410 QPS at 0.985 recall with
-itopk_size=64. Notably, itopk_size=32 delivers only 4,392 QPS — a 6.7× drop for
-halving itopk — because CAGRA's beam search is designed around warp-level GPU
+itopk_size=64. Notably, itopk_size=32 delivers only 4,392 QPS (a 6.7× drop for
+halving itopk), because CAGRA's beam search is designed around warp-level GPU
 parallelism and operates suboptimally below itopk=64. Beyond itopk=64, recall
 plateaus while QPS declines, so itopk=64 is the practical optimal.
 
-**IVF-PQ quantization ceiling** — the central result of this benchmark:
+**IVF-PQ quantization ceiling** (the central result of this benchmark):
 
 | pq_dim | Compression | Recall ceiling | Peak QPS |
 |---|---|---|---|
@@ -157,7 +157,7 @@ This is a fundamental limitation of product quantization, not a tuning issue.
 
 **The key insight:** CAGRA simultaneously achieves higher recall *and* higher QPS
 than any IVF-PQ configuration at recall > 0.95. The only reason to choose IVF-PQ
-over CAGRA is memory — IVF-PQ at pq_dim=96 uses ~8× less GPU memory.
+over CAGRA is memory; IVF-PQ at pq_dim=96 uses ~8× less GPU memory.
 
 ---
 
