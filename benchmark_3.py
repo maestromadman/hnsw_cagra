@@ -164,38 +164,7 @@ def main():
     del d_q, idx, res
     _free_gpu()
 
-    # ── IVF-PQ (multiple compression levels) ─────────────────────────────────
-    from cuvs.neighbors import ivf_pq
-    for pq_dim in IVF_PQ_DIMS:
-        label = f"IVF-PQ (pq_dim={pq_dim})"
-        print(f"\nBuilding {label}...")
-        res    = Resources()
-        d_vecs = cp.asarray(vectors)
-        idx    = ivf_pq.build(
-            ivf_pq.IndexParams(
-                n_lists=N_LISTS, pq_dim=pq_dim, pq_bits=PQ_BITS, metric="sqeuclidean"
-            ),
-            d_vecs, resources=res,
-        )
-        cp.cuda.Stream.null.synchronize()
-        del d_vecs
-        _free_gpu()
-
-        print(f"Sweeping {label} n_probes...")
-        d_q = cp.asarray(queries)
-        all_results[label] = _sweep(
-            label, "n_probes", IVF_PQ_PROBES,
-            lambda p, dq: ivf_pq.search(ivf_pq.SearchParams(n_probes=p), idx, dq, K, resources=res)[1],
-            d_q, queries, gt,
-        )
-        del d_q, idx, res
-        _free_gpu()
-
-    # ── CAGRA ─────────────────────────────────────────────────────────────────
-    # Full device sync to clear any leftover GPU state from IVF-PQ memory churn
-    cp.cuda.Device().synchronize()
-    _free_gpu()
-
+    # ── CAGRA (before IVF-PQ to avoid memory fragmentation from multiple PQ builds) ──
     print("\nBuilding CAGRA (slowest step)...")
     from cuvs.neighbors import cagra
     res    = Resources()
@@ -217,6 +186,33 @@ def main():
     )
     del d_q, idx, res
     _free_gpu()
+
+    # ── IVF-PQ (multiple compression levels) ─────────────────────────────────
+    from cuvs.neighbors import ivf_pq
+    for pq_dim in IVF_PQ_DIMS:
+        label = f"IVF-PQ (pq_dim={pq_dim})"
+        print(f"\nBuilding {label}...")
+        res    = Resources()
+        d_vecs = cp.asarray(vectors)
+        idx    = ivf_pq.build(
+            ivf_pq.IndexParams(
+                n_lists=N_LISTS, pq_dim=pq_dim, pq_bits=PQ_BITS, metric="sqeuclidean"
+            ),
+            d_vecs, resources=res,
+        )
+        cp.cuda.Stream.null.synchronize()
+        del d_vecs
+        _free_gpu()
+
+        print(f"Sweeping {label} n_probes...")
+        d_q = cp.asarray(queries)
+        all_results[label] = _sweep(
+            label, "n_probes", IVF_PQ_PROBES,
+            lambda p, dq, _idx=idx, _res=res: ivf_pq.search(ivf_pq.SearchParams(n_probes=p), _idx, dq, K, resources=_res)[1],
+            d_q, queries, gt,
+        )
+        del d_q, idx, res
+        _free_gpu()
 
     # ── Plot & cleanup ────────────────────────────────────────────────────────
     plot_pareto(all_results)
