@@ -12,3 +12,4 @@ __pycache__/
 
 # OS
 .DS_Store
+rmm_log.txt
