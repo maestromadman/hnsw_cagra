@@ -1,4 +1,4 @@
-# GPU-Accelerated Vector Search: HNSW vs cuVS Benchmark
+# GPU-Accelerated Vector Search: HNSW, cuVS Benchmark
 
 A structured benchmarking framework comparing GPU vector search algorithms
 across scale, dimensionality, query load, and the speed-accuracy tradeoff.
