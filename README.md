@@ -1,17 +1,17 @@
 # GPU-Accelerated Vector Search: HNSW vs cuVS Benchmark
 
-A structured benchmarking framework comparing CPU and GPU vector search algorithms
+A structured benchmarking framework comparing GPU vector search algorithms
 across scale, dimensionality, query load, and the speed-accuracy tradeoff.
-Built on **NVIDIA cuVS** (IVF-Flat, IVF-PQ, CAGRA) and **hnswlib** (HNSW),
+Built on **NVIDIA cuVS** (IVF-Flat, IVF-PQ, CAGRA) and (in one benchmark) **hnswlib** (HNSW),
 using real sentence-transformer embeddings on an **NVIDIA L4 GPU**.
 
 ---
 
 ## Motivation
 
-Vector search is the backbone of modern AI applications — RAG pipelines, semantic
-search, recommendation engines, and multimodal retrieval all depend on finding the
-nearest neighbours of an embedding vector across a large corpus quickly and accurately.
+Vector search is the backbone of modern AI applications such as RAG, semantic
+search, recommendation engines, and multimodal retrieval. They all depend on quickly and accurately finding 
+nearest neighbours of an embedding vector across a large corpus.
 
 The dominant open-source CPU solution is **hnswlib** (HNSW algorithm), widely used
 in production today. NVIDIA's **cuVS** library offers GPU-accelerated alternatives
@@ -198,28 +198,9 @@ python benchmark.py
 python benchmark_2.py
 ```
 
-**Run the Pareto frontier benchmark (~8 min):**
+**Run the Pareto frontier benchmark (~8 min, Most insightful benchmark):**
 ```bash
 python benchmark_3.py
 ```
 
----
 
-## Project Structure
-
-```
-benchmark.py        — CPU vs GPU across 7 scenarios (synthetic data)
-benchmark_2.py      — Parametric sweep: n_vectors, dim, n_queries, k
-benchmark_3.py      — Recall-QPS Pareto frontier with pq_dim ablation
-prepare_data.py     — Downloads / encodes real sentence-transformer embeddings
-hnsw.py             — Standalone hnswlib HNSW
-ivf_flat.py         — Standalone cuVS IVF-Flat
-ivf_pq.py           — Standalone cuVS IVF-PQ
-cagra.py            — Standalone cuVS CAGRA
-brute_force_knn.py  — Standalone cuVS Brute-Force
-exp_n_vectors.png   — benchmark_2: QPS vs corpus size
-exp_dim.png         — benchmark_2: QPS vs dimensionality
-exp_n_queries.png   — benchmark_2: QPS vs query batch size
-exp_k.png           — benchmark_2: QPS vs k
-exp_pareto.png      — benchmark_3: Recall-QPS Pareto frontier
-```
