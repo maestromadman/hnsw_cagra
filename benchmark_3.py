@@ -76,6 +76,19 @@ def _sweep(label, param_name, param_values, search_fn, d_queries, queries, gt):
     return results
 
 
+# ── Summary table ─────────────────────────────────────────────────────────────
+
+def print_summary(all_results):
+    col = [28, 10, 12, 12]
+    header = f"{'Index':<{col[0]}}{'Param':>{col[1]}}{'QPS':>{col[2]}}{'Recall@10':>{col[3]}}"
+    sep = "─" * sum(col)
+    print(f"\n{sep}\n{header}\n{sep}")
+    for name, results in all_results.items():
+        for r in results:
+            print(f"{name:<{col[0]}}{r['param']:>{col[1]}}{r['qps']:>{col[2]},.0f}{r['recall']:>{col[3]}.4f}")
+        print(sep)
+
+
 # ── Plot ───────────────────────────────────────────────────────────────────────
 
 def plot_pareto(all_results):
@@ -120,7 +133,8 @@ def plot_pareto(all_results):
             )
 
     ax.set_xlabel("Recall@10", fontsize=12)
-    ax.set_ylabel("QPS (queries per second)", fontsize=12)
+    ax.set_ylabel("QPS (queries per second, log scale)", fontsize=12)
+    ax.set_yscale("log")
     ax.set_title(
         "Recall-QPS Pareto Frontier  —  cuVS ANN Indexes on NVIDIA L4\n"
         "500K vectors · dim=768 · k=10 · 500 queries"
@@ -225,6 +239,9 @@ def main():
         )
         del d_q, idx, res
         _free_gpu()
+
+    # ── Summary table ─────────────────────────────────────────────────────────
+    print_summary(all_results)
 
     # ── Plot & cleanup ────────────────────────────────────────────────────────
     plot_pareto(all_results)
